@@ -27,21 +27,30 @@
   --ui:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",system-ui,sans-serif;
   color-scheme:light;
 }
-@media (prefers-color-scheme:dark){:root{
+/* dark: follows the phone until you pick one with the sun / moon button */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#1d1e22; --ink:#e4e4e2; --muted:#8b9098; --hair:#34353b; --chip:#2f3035; --field:#2c2d32; --sheet:#25262b;
   --accent:#5f86d6; --accent-2:#7396de; --on-accent:#fff; --alarm:#e0645a;
   --w0:#5f86d6; --w1:#cf6475; --w2:#9679c2; --w3:#cf9550; --w4:#5cb683;
   --i0:#16171a; --i1:#16171a; --i2:#16171a; --i3:#16171a; --i4:#16171a;
   color-scheme:dark;
 }}
-html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--bg)}
+:root[data-theme="dark"]{
+  --bg:#1d1e22; --ink:#e4e4e2; --muted:#8b9098; --hair:#34353b; --chip:#2f3035; --field:#2c2d32; --sheet:#25262b;
+  --accent:#5f86d6; --accent-2:#7396de; --on-accent:#fff; --alarm:#e0645a;
+  --w0:#5f86d6; --w1:#cf6475; --w2:#9679c2; --w3:#cf9550; --w4:#5cb683;
+  --i0:#16171a; --i1:#16171a; --i2:#16171a; --i3:#16171a; --i4:#16171a;
+  color-scheme:dark;
+}
+html{height:100%;overflow:hidden;overscroll-behavior:none;background:var(--bg)}
 body{margin:0}
 [hidden]{display:none!important}
 *{box-sizing:border-box}
 body{
-  touch-action:manipulation;-webkit-text-size-adjust:100%;overflow-x:hidden;min-height:100vh;
+  touch-action:manipulation;-webkit-text-size-adjust:100%;
+  position:fixed;inset:0;overflow:hidden;overscroll-behavior:none;   /* the page itself never scrolls; only the menu does */
   color:var(--ink);background:var(--bg);font-family:var(--ui);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased;
-  padding-inline:16px;padding-block:14px 28px;transition:background-color .35s,color .35s;
+  padding:calc(14px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));transition:background-color .35s,color .35s;
 }
 .wrap{max-width:540px;margin:0 auto}
 button{font:inherit;cursor:pointer;color:inherit;background:none;border:0;padding:0}
@@ -53,6 +62,17 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
 .top h1{margin:0;font-size:24px;font-weight:700;letter-spacing:-.4px;line-height:1.1}
 .status{display:block;font-size:12px;font-weight:700;color:var(--muted);margin-top:2px}
+.hbtns{display:flex;gap:8px}
+/* gray-scale wheel (menu → Wheel), light and dark */
+:root[data-wheel="gray"]{--w0:#2b2e33;--w1:#8a9099;--w2:#50555c;--w3:#b9bec5;--w4:#6b7079;--i0:#fff;--i1:#16171a;--i2:#fff;--i3:#2b2e33;--i4:#fff}
+@media (prefers-color-scheme:dark){:root[data-wheel="gray"]:not([data-theme="light"]){--w0:#e4e4e2;--w1:#5c6168;--w2:#b4b9c0;--w3:#3e4248;--w4:#8f949c;--i0:#16171a;--i1:#fff;--i2:#16171a;--i3:#fff;--i4:#16171a}}
+:root[data-wheel="gray"][data-theme="dark"]{--w0:#e4e4e2;--w1:#5c6168;--w2:#b4b9c0;--w3:#3e4248;--w4:#8f949c;--i0:#16171a;--i1:#fff;--i2:#16171a;--i3:#fff;--i4:#16171a}
+.wseg{display:inline-grid;grid-template-columns:1fr 1fr;gap:3px;padding:3px;border-radius:10px;background:var(--chip)}
+.wseg button{border-radius:8px;padding:6px 12px;font-size:14px;font-weight:700;color:var(--muted)}
+.wseg button[aria-pressed="true"]{background:var(--sheet);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.wrap{height:100%;display:flex;flex-direction:column}
+.desk{flex:1;display:flex;flex-direction:column;min-height:0}
+.main{flex:1;justify-content:center;min-height:0;padding-bottom:4vh}
 .icon-btn{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:var(--chip);color:var(--ink);flex:none}
 .icon-btn svg{width:19px;height:19px;stroke-width:2.2}
 
@@ -160,13 +180,14 @@ button:disabled{opacity:.4;cursor:not-allowed}
 @media (prefers-reduced-motion: reduce){.card,.pop,.wedge.win,.over .clock-wrap{animation:none}}
 html,body{touch-action:manipulation}   /* no double-tap zoom */
 </style>
+<script>try{var t=localStorage.getItem('spinner-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t;if(localStorage.getItem('spinner-wheel')==='gray')document.documentElement.dataset.wheel='gray'}catch(e){}</script>
 </head>
 <body>
 <div class="wrap" id="wrap">
   <div class="desk">
     <div class="top">
       <div><h1>Spinner</h1><span class="status" id="status"></span></div>
-      <button class="icon-btn round" id="cfg" aria-label="Open menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+      <span class="hbtns"><button class="icon-btn round" id="themeBtn" aria-label="Switch to dark mode"></button><button class="icon-btn round" id="cfg" aria-label="Open menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button></span>
     </div>
     <div class="main" id="main">
       <div class="stage">
@@ -576,6 +597,7 @@ function drawSettings(focusAdd) {
     <div class="set">
       <div class="cfg-row"><span>Timer</span><label class="switch"><input type="checkbox" id="tOn" ${t.on ? 'checked' : ''}><span class="track"></span></label></div>
       ${t.on ? `<div class="cfg-row"><span>Minutes each</span><span class="stepper"><button class="nudge" id="mDown" aria-label="Less time">−</button><output id="mins">${t.mins}</output><button class="nudge" id="mUp" aria-label="More time">+</button></span></div>` : ''}
+      <div class="cfg-row"><span>Wheel</span><span class="wseg" role="group" aria-label="Wheel colours"><button type="button" data-wheel="" aria-pressed="${!wheelGray()}">Colour</button><button type="button" data-wheel="gray" aria-pressed="${wheelGray()}">Gray</button></span></div>
       <div class="cfg-row"><span>Sound</span><label class="switch"><input type="checkbox" id="sOn" ${S.sound ? 'checked' : ''}><span class="track"></span></label></div>
     </div>
     <div class="ppl" id="ppl">${rows || '<p class="empty-ppl">No one yet. Add names below, or load the Infra team.</p>'}</div>
@@ -619,6 +641,7 @@ function drawSettings(focusAdd) {
   };
   $('#tOn').onchange = e => { S.timer.on = e.target.checked; save(); drawSettings(); };
   $('#sOn').onchange = e => { S.sound = e.target.checked; save(); if (S.sound) tick(); };
+  document.querySelectorAll('.wseg button').forEach(b => b.onclick = () => { setWheel(b.dataset.wheel); drawSettings(); renderWheel(); });
   if ($('#mUp')) {
     const step = d => { const m = S.timer.mins; S.timer.mins = clamp(m + d * (m + d * 0.5 <= 2 ? 0.5 : 1), 0.5, 30); save(); $('#mins').textContent = S.timer.mins; };
     $('#mUp').onclick = () => step(1); $('#mDown').onclick = () => step(-1);
@@ -638,6 +661,34 @@ document.addEventListener('keydown', e => {
   }
   if ((e.code === 'Space' || e.key === 'Enter') && !/BUTTON/.test(document.activeElement.tagName)) { e.preventDefault(); spin(); }
 });
+
+/* ---------- wheel colours: colour or gray scale (saved on this phone) ---------- */
+function wheelGray(){ return document.documentElement.dataset.wheel === 'gray' }
+function setWheel(v){
+  if(v === 'gray') document.documentElement.dataset.wheel = 'gray'; else delete document.documentElement.dataset.wheel;
+  try{ localStorage.setItem('spinner-wheel', v || '') }catch(e){}
+}
+
+/* ---------- light / dark ---------- */
+const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5a8.5 8.5 0 1 0 11.1 11.1z"/></svg>';
+const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6l1.4 1.4M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4L6 18M18 6l1.4-1.4"/></svg>';
+const sysDark = matchMedia('(prefers-color-scheme: dark)');
+function isDark(){ const t = document.documentElement.dataset.theme; return t ? t === 'dark' : sysDark.matches }
+function paintTheme(){
+  const dark = isDark();
+  $('#themeBtn').innerHTML = dark ? SUN : MOON;
+  $('#themeBtn').setAttribute('aria-label', dark ? 'Switch to light mode' : 'Switch to dark mode');
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => { m.content = dark ? '#1d1e22' : '#e4e5e8'; m.removeAttribute('media') });
+}
+(function(){ let t = null; try{ t = localStorage.getItem('spinner-theme') }catch(e){} if(t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; })();
+$('#themeBtn').onclick = () => {
+  const next = isDark() ? 'light' : 'dark';
+  document.documentElement.dataset.theme = next;
+  try{ localStorage.setItem('spinner-theme', next) }catch(e){}
+  paintTheme();
+};
+try{ sysDark.addEventListener('change', paintTheme) }catch(e){}
+paintTheme();
 
 /* ---------- start ---------- */
 rot = -360 / Math.max(2, onWheel().length) / 2;     // first wedge centred under the pointer
