@@ -10,6 +10,9 @@ A wheel that picks the order of people for a meeting or game. It is one static f
 
 ## Layout and decisions
 - **☰ menu:** Timer, Minutes each, Sound. Then **Appearance** (Light / Dark / Auto, a `.seg3` like Home Board's), then **Theme** (Classic / Gray cards with colour dots), then People.
+- **Smooth spins:** the wheel is four stacked layers: rim and face, the slices (`#rotorBox`), the hub, and the pointer (`#flapBox`). A spin or drag only changes the CSS `transform` of `#rotorBox` and `#flapBox` (with `will-change`), so the phone rotates finished pictures instead of redrawing every name and peg. Don't go back to setting a `transform` attribute inside the SVG.
+- **Upright names:** after a spin or a hand turn, `relevel()` fades names that ended up upside down and flips them, instead of redrawing the wheel.
+- **No menu jumps:** the menu sheet is drawn once (`drawSettings`). Taps update only what changed: the ticked row in place, `paintPeople()` for the list and the buttons under it, and the timer's minutes row shown or hidden. Redrawing the whole sheet scrolls it to the top and replays its slide-up.
 - **No redraws on switch:** changing theme or wheel updates the buttons in place (`paintLookCtl()`). The wheel colours are CSS variables (`--w0..4`, `--i0..4`), so nothing is redrawn and the menu doesn't jump.
 - **Locked page:** it never scrolls in the web app: `html{overflow:hidden}` and `body{position:fixed;inset:0}`.
 

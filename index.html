@@ -87,9 +87,14 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .main{display:flex;flex-direction:column;gap:16px}
 .stage{display:flex;flex-direction:column;align-items:center;gap:14px}
 .wheel-box{width:100%;max-width:max(280px,calc(100svh - 260px));aspect-ratio:424/436;position:relative}
-#wheel{display:block;width:100%;height:100%;touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none;overflow:visible}
-#wheel.dragging{cursor:grabbing}
-#rotor,#flap{transform-box:view-box}
+.wheel-box{touch-action:none;cursor:grab;-webkit-user-select:none;user-select:none}
+.wheel-box.dragging{cursor:grabbing}
+/* The wheel is four stacked layers drawn once each. A spin only rotates the slices layer and the pointer,
+   so the phone moves finished pictures instead of redrawing every name and peg on every frame. */
+.wheel-box > *{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.wheel-box svg{display:block;width:100%;height:100%;overflow:visible}
+#rotorBox{transform-origin:50% 51.3761%;will-change:transform}   /* the wheel's centre: 224 of 436 down */
+#flapBox{transform-origin:50% 4.1284%;will-change:transform;pointer-events:none}   /* the pointer's pivot: 18 of 436 down */
 .btns{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;max-width:420px}
 @media (min-width:860px) and (min-height:520px){ body{padding-block:22px} .wheel-box{max-width:calc(100vh - 230px)} }
 
@@ -101,7 +106,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .hubl{fill:var(--muted);font-family:var(--ui);font-weight:800;font-size:11px;letter-spacing:.08em}
 .pointer{fill:var(--ink);stroke:var(--bg);stroke-width:4;stroke-linejoin:round}
 .wedge{transition:opacity .25s,filter .25s}
-.wl{font-family:var(--ui);font-weight:700;pointer-events:none}
+.wl{font-family:var(--ui);font-weight:700;pointer-events:none;transition:opacity .15s}
+.wl.turning{opacity:0}
 .dim .wedge:not(.win),.dim .wl:not(.win){opacity:.3}
 .wedge.win{animation:flash .5s ease-in-out 3}
 @keyframes flash{50%{filter:brightness(1.15)}}
@@ -109,7 +115,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 
 /* ---------- pills ---------- */
 .brass{width:100%;max-width:420px;min-height:54px;border-radius:27px;padding:0 22px;font-size:18px;font-weight:700;letter-spacing:-.2px;background:var(--accent);color:var(--on-accent)}
-.brass:hover{background:var(--accent-2)}
+@media (hover:hover){.brass:hover{background:var(--accent-2)}}   /* no stuck dark colour after a tap on a phone */
 .brass:active{transform:scale(.98)}
 .brass:disabled{opacity:.6}
 .leather{min-height:54px;border-radius:27px;padding:0 18px;font-size:17px;font-weight:700;background:var(--chip);color:var(--ink)}
@@ -198,18 +204,15 @@ html,body{touch-action:manipulation}   /* no double-tap zoom */
     </div>
     <div class="main" id="main">
       <div class="stage">
-        <div class="wheel-box">
-          <svg id="wheel" viewBox="-212 -224 424 436" role="img" aria-label="Spinner wheel">
-            <circle class="rim" r="206"/>
-            <circle class="face" r="190"/>
-            <g id="rotor"></g>
-            <g id="hub" pointer-events="none">
-              <circle class="hub" r="44"/>
-              <text class="hubn" id="hubN" y="7" text-anchor="middle"></text>
-              <text class="hubl" id="hubL" y="25" text-anchor="middle">TO GO</text>
-            </g>
-            <g id="flap"><path class="pointer" d="M0 -168 C-5 -181 -15 -196 -15 -207 A15 15 0 0 1 15 -207 C15 -196 5 -181 0 -168 Z"/></g>
+        <div class="wheel-box" id="wheel" role="img" aria-label="Spinner wheel">
+          <svg viewBox="-212 -224 424 436" aria-hidden="true"><circle class="rim" r="206"/><circle class="face" r="190"/></svg>
+          <div id="rotorBox"><svg viewBox="-212 -224 424 436" aria-hidden="true"><g id="rotor"></g></svg></div>
+          <svg viewBox="-212 -224 424 436" aria-hidden="true" pointer-events="none">
+            <circle class="hub" r="44"/>
+            <text class="hubn" id="hubN" y="7" text-anchor="middle"></text>
+            <text class="hubl" id="hubL" y="25" text-anchor="middle">TO GO</text>
           </svg>
+          <div id="flapBox"><svg viewBox="-212 -224 424 436" aria-hidden="true"><path class="pointer" d="M0 -168 C-5 -181 -15 -196 -15 -207 A15 15 0 0 1 15 -207 C15 -196 5 -181 0 -168 Z"/></svg></div>
         </div>
         <div class="btns">
           <button class="brass" id="spinBtn">Spin</button>
@@ -360,13 +363,8 @@ function label(parent, name, mid, n, ink) {
   const lmid = (L_IN + L_OUT) / 2;
   const chord = n === 1 ? 999 : 2 * lmid * Math.sin(Math.PI / n);
   let size = clamp(Math.min(28, chord * 0.55, avail / (0.6 * Math.max(name.length, 3))), 9, 30);
-  const world = mod(mid + rot, 360);
-  const flip = world > 90 && world < 270;
-  const t = el('text', {
-    class: 'wl', 'dominant-baseline': 'central', 'font-size': size.toFixed(1), style: `fill:${ink}`,
-    x: flip ? -L_OUT : L_OUT, y: 0, 'text-anchor': flip ? 'start' : 'end',
-    transform: `rotate(${(flip ? mid + 180 : mid).toFixed(3)})`
-  }, parent);
+  const t = el('text', { class: 'wl', 'dominant-baseline': 'central', 'font-size': size.toFixed(1), style: `fill:${ink}`, y: 0 }, parent);
+  t.__mid = mid; placeLabel(t, upsideDown(mid));
   t.textContent = name;
   let w = 0; try { w = t.getComputedTextLength(); } catch (e) {}
   if (w > avail) {
@@ -378,7 +376,23 @@ function label(parent, name, mid, n, ink) {
   return t;
 }
 
+const upsideDown = mid => { const world = mod(mid + rot, 360); return world > 90 && world < 270; };
+function placeLabel(t, flip) {
+  t.__flip = flip;
+  t.setAttribute('x', flip ? -L_OUT : L_OUT); t.setAttribute('text-anchor', flip ? 'start' : 'end');
+  t.setAttribute('transform', `rotate(${(flip ? t.__mid + 180 : t.__mid).toFixed(3)})`);
+}
+// After the wheel stops or is turned by hand, names that ended up upside down fade out and back in the right way up
+function relevel() {
+  const turn = wedges.map(w => w.label).filter(t => t && t.__flip !== upsideDown(t.__mid));
+  if (!turn.length) return;
+  if (reduced) { turn.forEach(t => placeLabel(t, upsideDown(t.__mid))); return; }
+  turn.forEach(t => t.classList.add('turning'));
+  setTimeout(() => turn.forEach(t => { placeLabel(t, upsideDown(t.__mid)); t.classList.remove('turning'); }), 150);
+}
+
 /* ---------- motion: wheel, pegs and the brass pointer ---------- */
+const ROTOR = $('#rotorBox'), FLAP = $('#flapBox');
 let lastDir = 1, lastPeg = null;
 const flap = { a: 0, v: 0, target: 0 };
 let flapRaf = 0, flapT = 0;
@@ -386,7 +400,7 @@ let flapRaf = 0, flapT = 0;
 function setRot(r) {
   if (r !== rot) lastDir = r > rot ? 1 : -1;
   rot = r;
-  $('#rotor').setAttribute('transform', `rotate(${rot.toFixed(2)})`);
+  ROTOR.style.transform = `rotate(${rot.toFixed(2)}deg)`;
   const peg = Math.floor(-rot / pegStep);
   if (lastPeg !== null && peg !== lastPeg) tick();
   lastPeg = peg;
@@ -406,7 +420,7 @@ function flapLoop(now) {
     const s = Math.sign(flap.target);
     if (s && s * flap.a < s * flap.target) { flap.a = flap.target; flap.v = 0; }   // the peg holds it
   }
-  $('#flap').setAttribute('transform', `rotate(${flap.a.toFixed(2)} 0 -206)`);
+  FLAP.style.transform = `rotate(${flap.a.toFixed(2)}deg)`;
   if (spinning || drag || Math.abs(flap.a - flap.target) > 0.05 || Math.abs(flap.v) > 0.001) flapRaf = requestAnimationFrame(flapLoop);
   else flapRaf = 0;
 }
@@ -442,7 +456,7 @@ function spin(opts = {}) {
     setRot(from + D * easeOut(p));
     if (p < 1) requestAnimationFrame(frame);
     else {
-      ding();                                       // stay locked until the card is up
+      ding(); relevel();                            // stay locked until the card is up
       $('#wheel').classList.add('dim');
       mine.forEach(i => { wedges[i].node.classList.add('win'); wedges[i].label.classList.add('win'); });
       setTimeout(() => { spinning = false; paint(); reveal(winner); }, reduced ? 100 : 650);
@@ -453,20 +467,20 @@ function spin(opts = {}) {
 
 /* drag or flick the wheel; a plain tap spins it */
 let drag = null;
-function angleAt(e) {
-  const r = $('#wheel').getBoundingClientRect();
+function angleAt(e, r) {
   const cy = r.top + r.height * (224 / 436);
   return Math.atan2(e.clientY - cy, e.clientX - (r.left + r.width / 2)) * 180 / Math.PI;
 }
 $('#wheel').addEventListener('pointerdown', e => {
   if (spinning || ui.card || e.button > 0) return;
-  drag = { id: e.pointerId, last: angleAt(e), total: 0, r0: rot, samples: [{ t: performance.now(), r: rot }] };
+  const rect = $('#wheel').getBoundingClientRect();
+  drag = { id: e.pointerId, rect, last: angleAt(e, rect), total: 0, r0: rot, samples: [{ t: performance.now(), r: rot }] };
   $('#wheel').setPointerCapture(e.pointerId);
   $('#wheel').classList.add('dragging');
 });
 $('#wheel').addEventListener('pointermove', e => {
   if (!drag || e.pointerId !== drag.id || !onWheel().length) return;
-  const a = angleAt(e);
+  const a = angleAt(e, drag.rect);
   let d = a - drag.last; if (d > 180) d -= 360; if (d < -180) d += 360;
   drag.last = a; drag.total += d;
   setRot(drag.r0 + drag.total);
@@ -482,7 +496,7 @@ function endDrag(e) {
   const v = b.t > a.t && performance.now() - b.t < 120 ? (b.r - a.r) / (b.t - a.t) : 0;
   if (Math.abs(v) > 0.25) spin({ dir: Math.sign(v), v: Math.abs(v) });
   else if (Math.abs(d.total) < 4 && e.type === 'pointerup') spin();
-  else if (Math.abs(d.total) >= 4) renderWheel();     // re-level the names after a hand turn
+  else if (Math.abs(d.total) >= 4) relevel();         // turn the names upright after a hand turn
 }
 $('#wheel').addEventListener('pointerup', endDrag);
 $('#wheel').addEventListener('pointercancel', endDrag);
@@ -592,18 +606,15 @@ $('#spinBtn').onclick = () => spin();
 /* ---------- settings ---------- */
 function openSettings() { if (spinning || ui.card) return; ui.pop = true; $('#cfg').setAttribute('aria-expanded', 'true'); drawSettings(); }
 function closeSettings() { ui.pop = null; $('#cfg').setAttribute('aria-expanded', 'false'); $('#layer').innerHTML = ''; renderWheel(); paint(); }
-function drawSettings(focusAdd) {
-  const rows = S.people.map(p => `<div class="prow${p.in ? '' : ' out'}" data-id="${p.id}">
-      <button class="chk${p.in ? ' on' : ''}" data-act="in" aria-pressed="${p.in}" aria-label="${p.in ? 'On the wheel' : 'Sitting out'}: ${esc(p.name)}">${CHECK}</button>
-      <input value="${esc(p.name)}" aria-label="Name" maxlength="24" name="sp-${p.id}" ${NOFILL}>
-      ${isDone(p.id) ? `<span class="ord" title="Went ${S.done.findIndex(d => d.id === p.id) + 1}">${S.done.findIndex(d => d.id === p.id) + 1}</span>` : ''}
-      <button class="rm" data-act="rm" aria-label="Remove ${esc(p.name)}">${TRASH}</button></div>`).join('');
+// The sheet is drawn once when it opens. Taps inside it update just the part that changed, so it never
+// scrolls back to the top or replays its slide-up.
+function drawSettings() {
   const t = S.timer;
   $('#layer').innerHTML = `<div class="scrim scroll" id="scrim"><div class="pop" role="dialog" aria-modal="true" aria-label="Menu">
     <div class="pop-head"><div><div class="eyebrow">Menu</div><h2>On the wheel</h2></div><button class="icon-btn round" id="xSet" aria-label="Close menu">${X}</button></div>
     <div class="set">
       <div class="cfg-row"><span>Timer</span><label class="switch"><input type="checkbox" id="tOn" ${t.on ? 'checked' : ''}><span class="track"></span></label></div>
-      ${t.on ? `<div class="cfg-row"><span>Minutes each</span><span class="stepper"><button class="nudge" id="mDown" aria-label="Less time">−</button><output id="mins">${t.mins}</output><button class="nudge" id="mUp" aria-label="More time">+</button></span></div>` : ''}
+      <div class="cfg-row" id="minsRow" ${t.on ? '' : 'hidden'}><span>Minutes each</span><span class="stepper"><button class="nudge" id="mDown" aria-label="Less time">−</button><output id="mins">${t.mins}</output><button class="nudge" id="mUp" aria-label="More time">+</button></span></div>
       <div class="cfg-row"><span>Sound</span><label class="switch"><input type="checkbox" id="sOn" ${S.sound ? 'checked' : ''}><span class="track"></span></label></div>
     </div>
     <h3 class="mh">Appearance</h3>
@@ -614,23 +625,22 @@ function drawSettings(focusAdd) {
       <button type="button" class="skin" data-wheel="gray"><span class="dots"><i style="background:#2b2e33"></i><i style="background:#8a9099"></i><i style="background:#c4c8ce"></i></span><b>Gray</b></button>
     </div>
     <h3 class="mh">People</h3>
-    <div class="ppl" id="ppl">${rows || '<p class="empty-ppl">No one yet. Add names below, or load the Infra team.</p>'}</div>
+    <div class="ppl" id="ppl"></div>
     <div class="add"><input id="newName" placeholder="Add a name" maxlength="60" name="sp-new" ${NOFILL} enterkeyhint="done"><button class="add-btn" id="addP" aria-label="Add">${PLUS}</button></div>
-    <div class="preset">
-      <button class="leather green" id="infra">Load Infra team</button>
-      ${S.people.length ? `<button class="link${ui.confirmClear ? ' warn' : ''}" id="clearAll">${ui.confirmClear ? 'Tap again to clear' : 'Clear all'}</button>` : ''}
-    </div>
-    ${S.people.length ? '<p class="hint">Uncheck someone to sit them out. Numbers show the order people have gone this round.</p>' : ''}
-    ${S.done.length ? `<div class="preset"><button class="link" id="setNew">Bring everyone back</button><span class="hint">${S.done.length} gone so far</span></div>` : ''}
+    <div id="pplFoot" style="display:contents"></div>
   </div></div>`;
   $('#xSet').onclick = closeSettings;
   $('#scrim').addEventListener('click', e => { if (e.target.id === 'scrim') closeSettings(); });
   $('#ppl').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
-    const id = +b.closest('.prow').dataset.id, p = S.people.find(x => x.id === id);
-    if (b.dataset.act === 'in') p.in = !p.in;
-    if (b.dataset.act === 'rm') S.people = S.people.filter(x => x.id !== id);
-    save(); drawSettings(); renderWheel(); paint();
+    const row = b.closest('.prow'), id = +row.dataset.id, p = S.people.find(x => x.id === id);
+    if (b.dataset.act === 'in') {   // just this row changes
+      p.in = !p.in;
+      row.classList.toggle('out', !p.in); b.classList.toggle('on', p.in);
+      b.setAttribute('aria-pressed', String(p.in)); b.setAttribute('aria-label', (p.in ? 'On the wheel' : 'Sitting out') + ': ' + p.name);
+    }
+    if (b.dataset.act === 'rm') { S.people = S.people.filter(x => x.id !== id); paintPeople(); }
+    save(); renderWheel(); paint();
   });
   $('#ppl').addEventListener('input', e => {
     const id = +e.target.closest('.prow').dataset.id, p = S.people.find(x => x.id === id);
@@ -642,28 +652,43 @@ function drawSettings(focusAdd) {
     const names = $('#newName').value.split(',').map(s => s.trim()).filter(Boolean);
     if (!names.length) return;
     names.forEach(n => S.people.push({ id: S.nextId++, name: n.slice(0, 24), in: true }));
-    save(); drawSettings(true); renderWheel(); paint();
+    $('#newName').value = '';
+    save(); paintPeople(); renderWheel(); paint();
+    $('#newName').focus(); $('#newName').scrollIntoView({ block: 'nearest' });
   };
   $('#addP').onclick = add;
   $('#newName').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); add(); } });
-  if ($('#setNew')) $('#setNew').onclick = () => { bringBack(); drawSettings(); };
-  $('#infra').onclick = () => { loadInfra(); drawSettings(); renderWheel(); paint(); };
-  if ($('#clearAll')) $('#clearAll').onclick = () => {
-    if (!ui.confirmClear) { ui.confirmClear = setTimeout(() => { ui.confirmClear = 0; if (ui.pop) drawSettings(); }, 3000); drawSettings(); return; }
-    clearTimeout(ui.confirmClear); ui.confirmClear = 0;
-    S.people = []; S.done = []; save(); drawSettings(); renderWheel(); paint();
-  };
-  $('#tOn').onchange = e => { S.timer.on = e.target.checked; save(); drawSettings(); };
+  $('#tOn').onchange = e => { S.timer.on = e.target.checked; save(); $('#minsRow').hidden = !S.timer.on; };
   $('#sOn').onchange = e => { S.sound = e.target.checked; save(); if (S.sound) tick(); };
   // look: change it in place (no redraw, so nothing jumps)
   document.querySelectorAll('#modeSeg button').forEach(b => b.onclick = () => { setMode(b.dataset.m); paintLookCtl() });
   document.querySelectorAll('.skins .skin').forEach(b => b.onclick = () => { setWheel(b.dataset.wheel); paintLookCtl() });
   paintLookCtl();
-  if ($('#mUp')) {
-    const step = d => { const m = S.timer.mins; S.timer.mins = clamp(m + d * (m + d * 0.5 <= 2 ? 0.5 : 1), 0.5, 30); save(); $('#mins').textContent = S.timer.mins; };
-    $('#mUp').onclick = () => step(1); $('#mDown').onclick = () => step(-1);
-  }
-  if (focusAdd) $('#newName').focus();
+  const step = d => { const m = S.timer.mins; S.timer.mins = clamp(m + d * (m + d * 0.5 <= 2 ? 0.5 : 1), 0.5, 30); save(); $('#mins').textContent = S.timer.mins; };
+  $('#mUp').onclick = () => step(1); $('#mDown').onclick = () => step(-1);
+  paintPeople();
+}
+// the people list and the buttons under it
+function paintPeople() {
+  if (!$('#ppl')) return;
+  $('#ppl').innerHTML = S.people.map(p => `<div class="prow${p.in ? '' : ' out'}" data-id="${p.id}">
+      <button class="chk${p.in ? ' on' : ''}" data-act="in" aria-pressed="${p.in}" aria-label="${p.in ? 'On the wheel' : 'Sitting out'}: ${esc(p.name)}">${CHECK}</button>
+      <input value="${esc(p.name)}" aria-label="Name" maxlength="24" name="sp-${p.id}" ${NOFILL}>
+      ${isDone(p.id) ? `<span class="ord" title="Went ${S.done.findIndex(d => d.id === p.id) + 1}">${S.done.findIndex(d => d.id === p.id) + 1}</span>` : ''}
+      <button class="rm" data-act="rm" aria-label="Remove ${esc(p.name)}">${TRASH}</button></div>`).join('') || '<p class="empty-ppl">No one yet. Add names below, or load the Infra team.</p>';
+  $('#pplFoot').innerHTML = `<div class="preset">
+      <button class="leather green" id="infra">Load Infra team</button>
+      ${S.people.length ? `<button class="link${ui.confirmClear ? ' warn' : ''}" id="clearAll">${ui.confirmClear ? 'Tap again to clear' : 'Clear all'}</button>` : ''}
+    </div>
+    ${S.people.length ? '<p class="hint">Uncheck someone to sit them out. Numbers show the order people have gone this round.</p>' : ''}
+    ${S.done.length ? `<div class="preset"><button class="link" id="setNew">Bring everyone back</button><span class="hint">${S.done.length} gone so far</span></div>` : ''}`;
+  if ($('#setNew')) $('#setNew').onclick = () => { bringBack(); paintPeople(); };
+  $('#infra').onclick = () => { loadInfra(); paintPeople(); renderWheel(); paint(); };
+  if ($('#clearAll')) $('#clearAll').onclick = () => {
+    if (!ui.confirmClear) { ui.confirmClear = setTimeout(() => { ui.confirmClear = 0; if (ui.pop) paintPeople(); }, 3000); paintPeople(); return; }
+    clearTimeout(ui.confirmClear); ui.confirmClear = 0;
+    S.people = []; S.done = []; save(); paintPeople(); renderWheel(); paint();
+  };
 }
 $('#cfg').onclick = openSettings;
 
